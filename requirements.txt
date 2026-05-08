@@ -1,0 +1,7 @@
+requests
+pandas
+duckdb
+streamlit
+python-dotenv
+pytest
+pydantic
