@@ -6,5 +6,4 @@ if __name__ == "__main__":
     extract_adzuna_jobs() 
     process_raw_jobs()    
     
-    # A nova etapa:
     load_data_to_duckdb()

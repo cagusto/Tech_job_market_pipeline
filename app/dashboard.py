@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import os
-from typing import List, Optional, Set
+from typing import Any, List, Optional, Set, cast
 
 import duckdb
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 
@@ -60,7 +61,16 @@ TOP_SKILLS_LIMIT = 10
 PRIMARY_COLOR = "#2E86C1"
 SECONDARY_COLORS = ["#2E86C1", "#3498DB", "#5DADE2", "#85C1E9", "#AED6F1"]
 
-SENIORITY_ORDER: List[str] = ["Junior", "Pleno", "Senior", "Não Informado"]
+SENIORITY_ORDER: List[str] = [
+    "Estágio/Trainee",
+    "Assistente",
+    "Junior",
+    "Pleno",
+    "Sênior",
+    "Especialista",
+    "Gestão",
+    "Não Informado",
+]
 
 RAW_TABLE_COLUMNS: List[str] = [
     "job_title",
@@ -119,7 +129,7 @@ def _split_skills(skills_value: object) -> List[str]:
 
 
 def compute_skill_frequency(
-    dataframe: pd.DataFrame, top_n: int = TOP_SKILLS_LIMIT
+    dataframe: pd.DataFrame, top_n: Optional[int] = TOP_SKILLS_LIMIT
 ) -> pd.DataFrame:
     """Count skill frequency from comma-separated `skills` column."""
     if dataframe.empty or "skills" not in dataframe.columns:
@@ -131,6 +141,8 @@ def compute_skill_frequency(
 
     skill_counts = exploded_skills.value_counts().reset_index()
     skill_counts.columns = ["skill", "count"]
+    if top_n is None:
+        return skill_counts
     return skill_counts.head(top_n)
 
 
@@ -151,9 +163,11 @@ def compute_seniority_distribution(dataframe: pd.DataFrame) -> pd.DataFrame:
     distribution.columns = ["seniority", "job_count"]
 
     order_map = {level: index for index, level in enumerate(SENIORITY_ORDER)}
-    distribution["sort_key"] = distribution["seniority"].map(
-        lambda value: order_map.get(value, len(SENIORITY_ORDER))
-    )
+
+    def _seniority_sort_key(value: object) -> int:
+        return order_map.get(str(value), len(SENIORITY_ORDER))
+
+    distribution["sort_key"] = distribution["seniority"].map(_seniority_sort_key)
     return distribution.sort_values("sort_key").drop(columns=["sort_key"])
 
 
@@ -209,14 +223,14 @@ def apply_sidebar_filters(dataframe: pd.DataFrame) -> pd.DataFrame:
     if selected_seniorities:
         filtered = filtered[filtered["seniority"].isin(selected_seniorities)]
 
-    top_skills_df = compute_skill_frequency(filtered, top_n=TOP_SKILLS_LIMIT)
-    skill_options = top_skills_df["skill"].tolist()
+    all_skills_df = compute_skill_frequency(filtered, top_n=None)
+    skill_options = all_skills_df["skill"].tolist()
 
     selected_skills = st.sidebar.multiselect(
         "Skill Específica",
         options=skill_options,
         default=[],
-        placeholder="Todas do Top 10",
+        placeholder="Todas",
         help="Lista recalculada conforme os filtros acima.",
     )
 
@@ -241,7 +255,7 @@ def build_seniority_crosstab(dataframe: pd.DataFrame) -> pd.DataFrame:
     return crosstab
 
 
-def _style_plotly_figure(fig: px.Figure) -> px.Figure:
+def _style_plotly_figure(fig: go.Figure) -> go.Figure:
     """Apply transparent background and clean layout."""
     fig.update_layout(
         plot_bgcolor="rgba(0,0,0,0)",
@@ -254,7 +268,7 @@ def _style_plotly_figure(fig: px.Figure) -> px.Figure:
     return fig
 
 
-def _render_kpi_card(column: st.delta_generator.DeltaGenerator, label: str, value: int) -> None:
+def _render_kpi_card(column: Any, label: str, value: int) -> None:
     """Render one KPI card using custom HTML/CSS."""
     column.markdown(
         f"""
@@ -267,7 +281,7 @@ def _render_kpi_card(column: st.delta_generator.DeltaGenerator, label: str, valu
     )
 
 
-def render_kpi_row(dataframe: pd.DataFrame, top_skills_df: pd.DataFrame) -> None:
+def render_kpi_row(dataframe: pd.DataFrame, all_skills_df: pd.DataFrame) -> None:
     """Render KPI cards in a four-column layout."""
     st.markdown('<h3 class="section-title">📌 Métricas Principais</h3>', unsafe_allow_html=True)
 
@@ -276,19 +290,21 @@ def render_kpi_row(dataframe: pd.DataFrame, top_skills_df: pd.DataFrame) -> None
     total_locations = (
         dataframe["location_normalized"].nunique() if not dataframe.empty else 0
     )
-    monitored_skills = len(top_skills_df) if not top_skills_df.empty else 0
+    monitored_skills = len(all_skills_df) if not all_skills_df.empty else 0
 
     col_1, col_2, col_3, col_4 = st.columns(4)
     _render_kpi_card(col_1, "Total de Vagas", total_jobs)
     _render_kpi_card(col_2, "Categorias", total_categories)
-    _render_kpi_card(col_3, "Cidades", total_locations)
+    _render_kpi_card(col_3, "Localidade", total_locations)
     _render_kpi_card(col_4, "Skills Monitoradas", monitored_skills)
 
 
 def render_main_charts(
-    top_skills_df: pd.DataFrame, seniority_df: pd.DataFrame
+    top_skills_df: pd.DataFrame,
+    all_skills_df: pd.DataFrame,
+    seniority_df: pd.DataFrame,
 ) -> None:
-    """Render top skills bar chart and seniority donut chart."""
+    """Render top skills chart, full skills ranking and seniority donut chart."""
     st.markdown('<h3 class="section-title">📈 Panorama do Mercado</h3>', unsafe_allow_html=True)
     chart_left, chart_right = st.columns([6, 4])
 
@@ -314,6 +330,36 @@ def render_main_charts(
                 yaxis_title="",
             )
             st.plotly_chart(_style_plotly_figure(skills_fig), use_container_width=True)
+
+        st.markdown("##### Ranking Completo de Skills")
+        if all_skills_df.empty:
+            st.info("Nenhuma skill encontrada para montar o ranking completo.")
+        else:
+            skills_ranking_df = all_skills_df.rename(
+                columns={"skill": "Skill", "count": "Quantidade de Vagas"}
+            )
+            styled_ranking = (
+                skills_ranking_df.style.background_gradient(
+                    cmap="Blues",
+                    subset=cast(Any, pd.IndexSlice[:, ["Quantidade de Vagas"]]),
+                )
+                .format({"Quantidade de Vagas": "{:.0f}"})
+                .set_table_styles(
+                    [
+                        {
+                            "selector": "th",
+                            "props": [
+                                ("background-color", "#2E86C1"),
+                                ("color", "white"),
+                                ("font-weight", "600"),
+                                ("text-align", "center"),
+                            ],
+                        },
+                        {"selector": "td", "props": [("text-align", "center")]},
+                    ]
+                )
+            )
+            st.dataframe(styled_ranking, use_container_width=True, hide_index=True)
 
     with chart_right:
         st.markdown("##### 🎯 Distribuição de Senioridade")
@@ -347,7 +393,9 @@ def render_seniority_crosstab(crosstab_df: pd.DataFrame) -> None:
     numeric_columns = [col for col in display_df.columns if col != "Categoria da Vaga"]
 
     styled_table = (
-        display_df.style.background_gradient(cmap="Blues", subset=numeric_columns, axis=None)
+        display_df.style.background_gradient(
+            cmap="Blues", subset=cast(Any, numeric_columns), axis=None
+        )
         .format({col: "{:.0f}" for col in numeric_columns})
         .set_table_styles(
             [
@@ -438,13 +486,14 @@ def main() -> None:
     if filtered_df.empty:
         st.warning("Nenhuma vaga encontrada com os filtros selecionados. Ajuste os filtros na barra lateral.")
 
-    top_skills_df = compute_skill_frequency(filtered_df, top_n=TOP_SKILLS_LIMIT)
+    all_skills_df = compute_skill_frequency(filtered_df, top_n=None)
+    top_skills_df = all_skills_df.head(TOP_SKILLS_LIMIT)
     seniority_df = compute_seniority_distribution(filtered_df)
     seniority_crosstab_df = build_seniority_crosstab(filtered_df)
 
-    render_kpi_row(filtered_df, top_skills_df)
+    render_kpi_row(filtered_df, all_skills_df)
     st.divider()
-    render_main_charts(top_skills_df, seniority_df)
+    render_main_charts(top_skills_df, all_skills_df, seniority_df)
     st.divider()
     render_seniority_crosstab(seniority_crosstab_df)
     st.divider()

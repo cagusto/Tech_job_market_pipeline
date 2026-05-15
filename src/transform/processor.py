@@ -26,9 +26,16 @@ REMOTE_KEYWORDS: Tuple[str, ...] = (
 )
 
 SENIORITY_RULES: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
-    ("Junior", ("jr", "junior", "júnior", "trainee", "estagiário", "estagiaria")),
+    (
+        "Estágio/Trainee",
+        ("estagio", "estágio", "intern", "trainee", "estagiario", "estagiário", "estagiaria", "estagiária"),
+    ),
+    ("Assistente", ("assistente", "assistant")),
+    ("Junior", ("jr", "junior", "júnior")),
     ("Pleno", ("pleno", "mid", "mid-level", "mid level", "intermediate")),
-    ("Senior", ("sr", "senior", "sênior", "lead", "principal", "staff")),
+    ("Sênior", ("sr", "senior", "sênior", "principal")),
+    ("Especialista", ("especialista", "specialist", "lead", "tech lead")),
+    ("Gestão", ("manager", "gerente", "diretor", "diretora", "head", "coordenador", "coordenadora")),
 )
 
 JOB_CATEGORY_RULES: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
@@ -37,75 +44,175 @@ JOB_CATEGORY_RULES: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
     ("Engenheiro de Dados", ("engineer", "engenheiro", "engineering")),
 )
 
-BRAZILIAN_STATES: Dict[str, str] = {
+# Mapping dictionary: cities/capitals/aliases -> Brazilian state name.
+LOCATION_TO_STATE_MAP: Dict[str, str] = {
+    # Acre
     "acre": "Acre",
+    "rio branco": "Acre",
+    "ac": "Acre",
+    # Alagoas
     "alagoas": "Alagoas",
+    "maceio": "Alagoas",
+    "maceió": "Alagoas",
+    "al": "Alagoas",
+    # Amapá
     "amapa": "Amapá",
     "amapá": "Amapá",
+    "macapa": "Amapá",
+    "macapá": "Amapá",
+    "ap": "Amapá",
+    # Amazonas
     "amazonas": "Amazonas",
+    "manaus": "Amazonas",
+    "am": "Amazonas",
+    # Bahia
     "bahia": "Bahia",
+    "salvador": "Bahia",
+    "feira de santana": "Bahia",
+    "ba": "Bahia",
+    # Ceará
     "ceara": "Ceará",
     "ceará": "Ceará",
+    "fortaleza": "Ceará",
+    "ce": "Ceará",
+    # Distrito Federal
     "distrito federal": "Distrito Federal",
+    "brasilia": "Distrito Federal",
+    "brasília": "Distrito Federal",
+    "df": "Distrito Federal",
+    # Espírito Santo
     "espirito santo": "Espírito Santo",
     "espírito santo": "Espírito Santo",
+    "vitoria": "Espírito Santo",
+    "vitória": "Espírito Santo",
+    "vila velha": "Espírito Santo",
+    "serra": "Espírito Santo",
+    "cariacica": "Espírito Santo",
+    "anchieta": "Espírito Santo",
+    "es": "Espírito Santo",
+    # Goiás
     "goias": "Goiás",
     "goiás": "Goiás",
+    "goiania": "Goiás",
+    "goiânia": "Goiás",
+    "aparecida de goiania": "Goiás",
+    "go": "Goiás",
+    # Maranhão
     "maranhao": "Maranhão",
     "maranhão": "Maranhão",
-    "mato grosso do sul": "Mato Grosso do Sul",
+    "sao luis": "Maranhão",
+    "são luís": "Maranhão",
+    "ma": "Maranhão",
+    # Mato Grosso
     "mato grosso": "Mato Grosso",
+    "cuiaba": "Mato Grosso",
+    "cuiabá": "Mato Grosso",
+    "mt": "Mato Grosso",
+    # Mato Grosso do Sul
+    "mato grosso do sul": "Mato Grosso do Sul",
+    "campo grande": "Mato Grosso do Sul",
+    "ms": "Mato Grosso do Sul",
+    # Minas Gerais
     "minas gerais": "Minas Gerais",
+    "belo horizonte": "Minas Gerais",
+    "contagem": "Minas Gerais",
+    "uberlandia": "Minas Gerais",
+    "uberlândia": "Minas Gerais",
+    "betim": "Minas Gerais",
+    "juiz de fora": "Minas Gerais",
+    "montes claros": "Minas Gerais",
+    "mg": "Minas Gerais",
+    # Pará
     "para": "Pará",
     "pará": "Pará",
+    "belem": "Pará",
+    "belém": "Pará",
+    "ananindeua": "Pará",
+    "pa": "Pará",
+    # Paraíba
     "paraiba": "Paraíba",
     "paraíba": "Paraíba",
+    "joao pessoa": "Paraíba",
+    "joão pessoa": "Paraíba",
+    "pb": "Paraíba",
+    # Paraná
     "parana": "Paraná",
     "paraná": "Paraná",
+    "curitiba": "Paraná",
+    "londrina": "Paraná",
+    "maringa": "Paraná",
+    "maringá": "Paraná",
+    "pr": "Paraná",
+    # Pernambuco
     "pernambuco": "Pernambuco",
+    "recife": "Pernambuco",
+    "olinda": "Pernambuco",
+    "pe": "Pernambuco",
+    # Piauí
     "piaui": "Piauí",
     "piauí": "Piauí",
+    "teresina": "Piauí",
+    "pi": "Piauí",
+    # Rio de Janeiro
     "rio de janeiro": "Rio de Janeiro",
+    "niteroi": "Rio de Janeiro",
+    "niterói": "Rio de Janeiro",
+    "duque de caxias": "Rio de Janeiro",
+    "nova iguacu": "Rio de Janeiro",
+    "nova iguaçu": "Rio de Janeiro",
+    "sao goncalo": "Rio de Janeiro",
+    "são gonçalo": "Rio de Janeiro",
+    "rj": "Rio de Janeiro",
+    # Rio Grande do Norte
     "rio grande do norte": "Rio Grande do Norte",
+    "natal": "Rio Grande do Norte",
+    "rn": "Rio Grande do Norte",
+    # Rio Grande do Sul
     "rio grande do sul": "Rio Grande do Sul",
+    "porto alegre": "Rio Grande do Sul",
+    "caxias do sul": "Rio Grande do Sul",
+    "canoas": "Rio Grande do Sul",
+    "rs": "Rio Grande do Sul",
+    # Rondônia
     "rondonia": "Rondônia",
     "rondônia": "Rondônia",
+    "porto velho": "Rondônia",
+    "ro": "Rondônia",
+    # Roraima
     "roraima": "Roraima",
+    "boa vista": "Roraima",
+    "rr": "Roraima",
+    # Santa Catarina
     "santa catarina": "Santa Catarina",
+    "florianopolis": "Santa Catarina",
+    "florianópolis": "Santa Catarina",
+    "joinville": "Santa Catarina",
+    "blumenau": "Santa Catarina",
+    "sc": "Santa Catarina",
+    # São Paulo
     "sao paulo": "São Paulo",
     "são paulo": "São Paulo",
-    "sergipe": "Sergipe",
-    "tocantins": "Tocantins",
-    "ac": "Acre",
-    "al": "Alagoas",
-    "ap": "Amapá",
-    "am": "Amazonas",
-    "ba": "Bahia",
-    "ce": "Ceará",
-    "df": "Distrito Federal",
-    "es": "Espírito Santo",
-    "go": "Goiás",
-    "ma": "Maranhão",
-    "ms": "Mato Grosso do Sul",
-    "mt": "Mato Grosso",
-    "mg": "Minas Gerais",
-    "pa": "Pará",
-    "pb": "Paraíba",
-    "pr": "Paraná",
-    "pe": "Pernambuco",
-    "pi": "Piauí",
-    "rj": "Rio de Janeiro",
-    "rn": "Rio Grande do Norte",
-    "rs": "Rio Grande do Sul",
-    "ro": "Rondônia",
-    "rr": "Roraima",
-    "sc": "Santa Catarina",
+    "campinas": "São Paulo",
+    "santos": "São Paulo",
+    "guarulhos": "São Paulo",
+    "sorocaba": "São Paulo",
+    "ribeirao preto": "São Paulo",
+    "ribeirão preto": "São Paulo",
+    "sao jose dos campos": "São Paulo",
+    "são josé dos campos": "São Paulo",
+    "osasco": "São Paulo",
     "sp": "São Paulo",
+    # Sergipe
+    "sergipe": "Sergipe",
+    "aracaju": "Sergipe",
     "se": "Sergipe",
+    # Tocantins
+    "tocantins": "Tocantins",
+    "palmas": "Tocantins",
     "to": "Tocantins",
 }
 
-# Longer phrases first to avoid partial matches (e.g., "power bi" before "bi").
+# Longer phrases first to avoid partial matches (e.g., "machine learning" before "r").
 TECH_SKILLS: Tuple[str, ...] = (
     "apache airflow",
     "apache kafka",
@@ -113,24 +220,32 @@ TECH_SKILLS: Tuple[str, ...] = (
     "amazon redshift",
     "google bigquery",
     "microsoft fabric",
-    "power bi",
     "machine learning",
     "deep learning",
     "data warehouse",
-    "data lake",
     "data modeling",
+    "sql server",
+    "power bi",
+    "data lake",
     "scikit-learn",
+    "ci/cd",
     "pytorch",
     "tensorflow",
     "kubernetes",
     "terraform",
     "postgresql",
+    "postgres",
     "mysql",
     "mongodb",
     "snowflake",
     "databricks",
+    "bigquery",
+    "redshift",
+    "cassandra",
+    "metabase",
     "looker",
     "tableau",
+    "qlik",
     "powerbi",
     "airflow",
     "dbt",
@@ -142,6 +257,7 @@ TECH_SKILLS: Tuple[str, ...] = (
     "trino",
     "flink",
     "redis",
+    "oracle",
     "elasticsearch",
     "docker",
     "jenkins",
@@ -159,6 +275,9 @@ TECH_SKILLS: Tuple[str, ...] = (
     "gcp",
     "java",
     "scala",
+    "nlp",
+    "agile",
+    "scrum",
     "r",
     "go",
     "rust",
@@ -178,7 +297,6 @@ TECH_SKILLS: Tuple[str, ...] = (
     "polars",
     "duckdb",
     "superset",
-    "metabase",
     "lookml",
     "etl",
     "elt",
@@ -192,10 +310,18 @@ def _normalize_text(value: Optional[object]) -> str:
     return str(value).strip().lower()
 
 
+def _build_keyword_pattern(keyword: str) -> str:
+    """Build a regex pattern that respects token boundaries around a keyword."""
+    escaped_keyword = re.escape(keyword)
+    start_boundary = r"\b" if re.match(r"\w", keyword[0]) else r"(?<!\w)"
+    end_boundary = r"\b" if re.match(r"\w", keyword[-1]) else r"(?!\w)"
+    return rf"{start_boundary}{escaped_keyword}{end_boundary}"
+
+
 def _contains_any_keyword(text: str, keywords: Tuple[str, ...]) -> bool:
-    """Check whether any keyword appears in text using word boundaries."""
+    """Check whether any keyword appears in text using word/token boundaries."""
     for keyword in keywords:
-        pattern = rf"\b{re.escape(keyword)}\b"
+        pattern = _build_keyword_pattern(keyword)
         if re.search(pattern, text, flags=re.IGNORECASE):
             return True
     return False
@@ -221,56 +347,54 @@ def categorize_job_category(job_title: Optional[object]) -> str:
     return "Outros"
 
 
-def extract_seniority(job_title: Optional[object]) -> str:
-    """Extract seniority level from the original job title.
+def extract_seniority(
+    job_title: Optional[object], description: Optional[object] = None
+) -> str:
+    """Extract seniority level from the original job title and description.
 
     Args:
         job_title: Original job title from the source system.
+        description: Job description text.
 
     Returns:
-        Seniority label (Junior, Pleno, Senior, or Não Informado).
+        Seniority label by highest detected hierarchy, or Não Informado.
     """
-    title = _normalize_text(job_title)
-    if not title:
+    searchable_text = f"{_normalize_text(job_title)} {_normalize_text(description)}".strip()
+    if not searchable_text:
         return "Não Informado"
 
-    for seniority, keywords in SENIORITY_RULES:
-        if _contains_any_keyword(title, keywords):
+    for seniority, keywords in reversed(SENIORITY_RULES):
+        if _contains_any_keyword(searchable_text, keywords):
             return seniority
 
     return "Não Informado"
 
 
-def _is_remote_location(location_text: str) -> bool:
-    """Return True when location text indicates remote work."""
-    return any(keyword in location_text for keyword in REMOTE_KEYWORDS)
+def _lookup_state_from_text(location_text: str) -> Optional[str]:
+    """Match a location string against the mapping dictionary."""
+    cleaned_text = re.sub(r"^estado de\s+", "", location_text, flags=re.IGNORECASE)
+    cleaned_text = re.sub(r"\s+", " ", cleaned_text).strip().lower()
+    if not cleaned_text:
+        return None
 
-
-def _extract_brazilian_state(location_text: str) -> Optional[str]:
-    """Try to identify a Brazilian state from a location string."""
-    cleaned = re.sub(r"^estado de\s+", "", location_text, flags=re.IGNORECASE)
-    cleaned = cleaned.replace("  ", " ").strip()
-
-    # Check full location and comma-separated segments (city, state patterns).
-    segments = [segment.strip() for segment in cleaned.split(",") if segment.strip()]
-    candidates = segments if segments else [cleaned]
-
-    # Longest state names first to avoid partial false positives.
-    sorted_states = sorted(BRAZILIAN_STATES.items(), key=lambda item: len(item[0]), reverse=True)
-
-    for candidate in reversed(candidates):
-        candidate_norm = candidate.lower()
-        for state_key, state_name in sorted_states:
-            if re.search(rf"\b{re.escape(state_key)}\b", candidate_norm, flags=re.IGNORECASE):
-                return state_name
-            if candidate_norm == state_key:
-                return state_name
+    # Longest keys first to prioritize specific city names over short aliases.
+    sorted_keys = sorted(LOCATION_TO_STATE_MAP.keys(), key=len, reverse=True)
+    for location_key in sorted_keys:
+        pattern = rf"\b{re.escape(location_key)}\b"
+        if re.search(pattern, cleaned_text, flags=re.IGNORECASE):
+            return LOCATION_TO_STATE_MAP[location_key]
 
     return None
 
 
 def normalize_location(location: Optional[object]) -> str:
-    """Normalize location into Remoto or a Brazilian state when possible.
+    """Normalize location using mapping dictionary rules.
+
+    Rules:
+        1) Remote keywords -> ``Remoto``.
+        2) Dictionary lookup (case-insensitive) for states/cities/aliases.
+        3) Fallback to the last comma-separated token lookup.
+        4) If still unmatched -> ``Outros``.
 
     Args:
         location: Raw location value from source.
@@ -282,16 +406,33 @@ def normalize_location(location: Optional[object]) -> str:
     if not location_text:
         return "Não Informado"
 
-    if _is_remote_location(location_text):
+    if any(keyword in location_text for keyword in REMOTE_KEYWORDS):
         return "Remoto"
 
-    state = _extract_brazilian_state(location_text)
-    if state:
-        return state
+    # Try full string first, then each comma-separated segment (right to left).
+    segments = [
+        segment.strip()
+        for segment in re.sub(r"^estado de\s+", "", location_text, flags=re.IGNORECASE).split(",")
+        if segment.strip()
+    ]
+    search_candidates = [location_text] + list(reversed(segments))
 
-    # Fallback: keep a simplified free-text location without noisy prefixes.
-    simplified = re.sub(r"^estado de\s+", "", location_text, flags=re.IGNORECASE).strip()
-    return simplified.title() if simplified else "Não Informado"
+    for candidate in search_candidates:
+        mapped_state = _lookup_state_from_text(candidate)
+        if mapped_state:
+            return mapped_state
+
+    # Fallback: last term after comma, including direct dictionary key match.
+    if segments:
+        last_segment = segments[-1].strip().lower()
+        if last_segment in LOCATION_TO_STATE_MAP:
+            return LOCATION_TO_STATE_MAP[last_segment]
+
+        mapped_last_segment = _lookup_state_from_text(last_segment)
+        if mapped_last_segment:
+            return mapped_last_segment
+
+    return "Outros"
 
 
 def extract_skills_from_description(description: Optional[object]) -> str:
@@ -309,7 +450,7 @@ def extract_skills_from_description(description: Optional[object]) -> str:
 
     found_skills: List[str] = []
     for skill in TECH_SKILLS:
-        pattern = rf"\b{re.escape(skill)}\b"
+        pattern = _build_keyword_pattern(skill)
         if re.search(pattern, text, flags=re.IGNORECASE):
             found_skills.append(skill)
 
@@ -345,7 +486,10 @@ def _apply_business_rules(dataframe: pd.DataFrame) -> pd.DataFrame:
     enriched = dataframe.copy()
 
     enriched["job_category"] = enriched["job_title"].apply(categorize_job_category)
-    enriched["seniority"] = enriched["job_title"].apply(extract_seniority)
+    enriched["seniority"] = enriched.apply(
+        lambda row: extract_seniority(row.get("job_title"), row.get("description")),
+        axis=1,
+    )
     enriched["location_normalized"] = enriched["location"].apply(normalize_location)
     enriched["skills"] = enriched["description"].apply(extract_skills_from_description)
 
