@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 import logging
 import os
-from typing import Any, Dict, List
+import time
+from typing import Any, Dict, List, Set
 
 import requests
 import urllib3
@@ -21,7 +22,16 @@ ADZUNA_BASE_URL = "https://api.adzuna.com/v1/api/jobs"
 DEFAULT_COUNTRY = "br"
 DEFAULT_RESULTS_PER_PAGE = 50
 DEFAULT_TIMEOUT_SECONDS = 15
+MAX_PAGES_PER_SEARCH = 5
+REQUEST_DELAY_SECONDS = 1
 RAW_OUTPUT_PATH = os.path.join("data", "raw", "raw_adzuna_jobs.json")
+
+JOB_TITLES: List[str] = [
+    "Data Engineer",
+    "Data Scientist",
+    "Analytics Engineer",
+]
+SEARCH_LOCATIONS: List[str] = ["Brasil", "Remoto"]
 
 
 def _build_query_params(
@@ -38,21 +48,33 @@ def _build_query_params(
     }
 
 
-def _fetch_jobs(
+def _fetch_jobs_page(
     country: str,
     page: int,
     app_id: str,
     app_key: str,
-    search_term: str,
+    job_title: str,
     location: str,
 ) -> List[Dict[str, Any]]:
-    """Fetch jobs from Adzuna for one search location."""
+    """Fetch one page of jobs from Adzuna for a title/location pair.
+
+    Args:
+        country: Adzuna country code (e.g. ``br``).
+        page: Page number to request.
+        app_id: Adzuna application ID.
+        app_key: Adzuna application key.
+        job_title: Job title search term.
+        location: Location search term.
+
+    Returns:
+        List of job records returned for the requested page.
+    """
     endpoint = f"{ADZUNA_BASE_URL}/{country}/search/{page}"
     params = _build_query_params(
         app_id=app_id,
         app_key=app_key,
         page=page,
-        search_term=search_term,
+        search_term=job_title,
         location=location,
     )
 
@@ -67,26 +89,110 @@ def _fetch_jobs(
     return payload.get("results", [])
 
 
-def extract_adzuna_jobs(page: int = 1) -> Dict[str, Any]:
-    """Extract Data Engineer jobs from Adzuna and persist raw JSON.
-
-    This function reads Adzuna credentials from environment variables loaded
-    from a `.env` file, fetches Data Engineer vacancies for Brazil and remote
-    searches, and stores the raw extraction output in `data/raw`.
+def _fetch_paginated_jobs(
+    country: str,
+    app_id: str,
+    app_key: str,
+    job_title: str,
+    location: str,
+) -> List[Dict[str, Any]]:
+    """Fetch up to ``MAX_PAGES_PER_SEARCH`` pages for one title/location.
 
     Args:
-        page: The result page number to query in the Adzuna API.
+        country: Adzuna country code.
+        app_id: Adzuna application ID.
+        app_key: Adzuna application key.
+        job_title: Job title search term.
+        location: Location search term.
 
     Returns:
-        A dictionary containing metadata and extracted raw job records.
+        Combined list of jobs across all fetched pages.
+    """
+    collected_jobs: List[Dict[str, Any]] = []
+
+    for page in range(1, MAX_PAGES_PER_SEARCH + 1):
+        logger.info(
+            "INFO - Fetching jobs | title='%s' | location='%s' | page=%s/%s",
+            job_title,
+            location,
+            page,
+            MAX_PAGES_PER_SEARCH,
+        )
+
+        page_jobs = _fetch_jobs_page(
+            country=country,
+            page=page,
+            app_id=app_id,
+            app_key=app_key,
+            job_title=job_title,
+            location=location,
+        )
+
+        if not page_jobs:
+            logger.info(
+                "INFO - No results returned | title='%s' | location='%s' | page=%s. "
+                "Stopping pagination for this search.",
+                job_title,
+                location,
+                page,
+            )
+            break
+
+        collected_jobs.extend(page_jobs)
+        logger.info(
+            "INFO - Page fetched | title='%s' | location='%s' | page=%s | "
+            "records_on_page=%s | records_accumulated=%s",
+            job_title,
+            location,
+            page,
+            len(page_jobs),
+            len(collected_jobs),
+        )
+
+        time.sleep(REQUEST_DELAY_SECONDS)
+
+    return collected_jobs
+
+
+def _deduplicate_jobs(jobs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Remove duplicate jobs by Adzuna ID while preserving order."""
+    seen_ids: Set[Any] = set()
+    deduplicated_jobs: List[Dict[str, Any]] = []
+
+    for job in jobs:
+        job_id = job.get("id")
+        if job_id in seen_ids:
+            continue
+        seen_ids.add(job_id)
+        deduplicated_jobs.append(job)
+
+    return deduplicated_jobs
+
+
+def extract_adzuna_jobs() -> Dict[str, Any]:
+    """Extract multiple job titles from Adzuna and persist raw JSON.
+
+    Iterates over predefined job titles and locations, paginating up to
+    ``MAX_PAGES_PER_SEARCH`` pages per search. Applies a delay between API
+    calls to reduce rate-limit errors and writes all results to a single
+    ``raw_adzuna_jobs.json`` file.
+
+    Returns:
+        Dictionary containing metadata and extracted raw job records.
 
     Raises:
         ValueError: If required API credentials are missing.
-        RequestException: If the HTTP request fails (e.g., timeout/connection).
+        RequestException: If an HTTP request fails.
         OSError: If writing the output file fails.
         json.JSONDecodeError: If API response is not valid JSON.
     """
-    logger.info("INFO - Starting Adzuna extraction for Data Engineer jobs.")
+    logger.info(
+        "INFO - Starting Adzuna extraction | titles=%s | locations=%s | "
+        "max_pages=%s",
+        JOB_TITLES,
+        SEARCH_LOCATIONS,
+        MAX_PAGES_PER_SEARCH,
+    )
 
     load_dotenv()
     app_id = os.getenv("ADZUNA_APP_ID")
@@ -100,45 +206,34 @@ def extract_adzuna_jobs(page: int = 1) -> Dict[str, Any]:
             "Missing ADZUNA_APP_ID and/or ADZUNA_APP_KEY in environment variables."
         )
 
+    all_jobs: List[Dict[str, Any]] = []
+
     try:
-        brazil_jobs = _fetch_jobs(
-            country=DEFAULT_COUNTRY,
-            page=page,
-            app_id=app_id,
-            app_key=app_key,
-            search_term="Data Engineer",
-            location="Brasil",
-        )
-        remote_jobs = _fetch_jobs(
-            country=DEFAULT_COUNTRY,
-            page=page,
-            app_id=app_id,
-            app_key=app_key,
-            search_term="Data Engineer",
-            location="Remoto",
-        )
+        for job_title in JOB_TITLES:
+            logger.info("INFO - Processing job title='%s'.", job_title)
+
+            for location in SEARCH_LOCATIONS:
+                title_location_jobs = _fetch_paginated_jobs(
+                    country=DEFAULT_COUNTRY,
+                    app_id=app_id,
+                    app_key=app_key,
+                    job_title=job_title,
+                    location=location,
+                )
+                all_jobs.extend(title_location_jobs)
+
     except RequestException as exc:
         logger.error("ERROR - Adzuna API request failed: %s", exc)
         raise
 
-    combined_jobs = brazil_jobs + remote_jobs
-
-    # Remove duplicates by Adzuna job id while preserving order.
-    seen_ids = set()
-    deduplicated_jobs: List[Dict[str, Any]] = []
-    for job in combined_jobs:
-        job_id = job.get("id")
-        if job_id in seen_ids:
-            continue
-        seen_ids.add(job_id)
-        deduplicated_jobs.append(job)
+    deduplicated_jobs = _deduplicate_jobs(all_jobs)
 
     extraction_payload: Dict[str, Any] = {
         "source": "adzuna",
         "country": DEFAULT_COUNTRY,
-        "query": "Data Engineer",
-        "locations": ["Brasil", "Remoto"],
-        "page": page,
+        "job_titles": JOB_TITLES,
+        "locations": SEARCH_LOCATIONS,
+        "max_pages_per_search": MAX_PAGES_PER_SEARCH,
         "total_records": len(deduplicated_jobs),
         "results": deduplicated_jobs,
     }
@@ -148,7 +243,7 @@ def extract_adzuna_jobs(page: int = 1) -> Dict[str, Any]:
         json.dump(extraction_payload, file, ensure_ascii=False, indent=2)
 
     logger.info(
-        "SUCCESS - Adzuna extraction finished. %s records saved to %s.",
+        "SUCCESS - Adzuna extraction finished. %s unique records saved to %s.",
         extraction_payload["total_records"],
         RAW_OUTPUT_PATH,
     )
