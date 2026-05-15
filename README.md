@@ -23,35 +23,53 @@ O projeto segue um fluxo clássico de **ETL (Extract, Transform, Load)**:
 git clone [https://github.com/SEU_USUARIO/tech-job-market-pipeline.git](https://github.com/SEU_USUARIO/tech-job-market-pipeline.git)
 cd tech-job-market-pipeline
 python -m venv venv
-2. Ativar o Ambiente Virtual
+
+### 2. Ativar o Ambiente Virtual
 •	Windows: venv\Scripts\activate
 •	Linux/Mac: source venv/bin/activate
-3. Instalar Dependências
+
+### 3. Instalar Dependências
 pip install -r requirements.txt
-4. Configurar Credenciais
+
+### 4. Configurar Credenciais
 Crie um arquivo .env na raiz do projeto baseado no .env.example:
 ADZUNA_APP_ID=seu_id_aqui
 ADZUNA_APP_KEY=sua_chave_aqui
 (As chaves podem ser obtidas gratuitamente no portal de desenvolvedores da Adzuna).
-5. Executar o Pipeline (ETL)
+
+### 5. Executar o Pipeline (ETL)
 Isso irá baixar os dados, processar e criar o banco DuckDB:
 python main.py
-6. Executar o Dashboard
+
+### 6. Executar o Dashboard
 streamlit run app/dashboard.py
+
 📂 Estrutura de Diretórios
-Plaintext
+
 tech-job-market-pipeline/
+
 ├── app/                  # Frontend (Streamlit)
+
 ├── data/                 # Arquivos ignorados pelo Git (.gitignore)
+
 │   ├── raw/              # JSONs originais
+
 │   └── processed/        # Parquets e banco DuckDB
+
 ├── src/                  # Backend do Pipeline (Módulos)
+
 │   ├── extract/          # Lógica de consumo da API
+
 │   ├── transform/        # Limpeza e NLP/Regex
+
 │   └── load/             # Conexão com o banco de dados
+
 ├── tests/                # Testes Unitários (A implementar)
+
 ├── main.py               # Orquestrador principal do script
+
 ├── requirements.txt      # Dependências do projeto
+
 └── README.md
 
 *(Lembre-se de trocar `SEU_USUARIO` no link do `git clone` pelo seu usuário real do GitHub).*
